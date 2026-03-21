@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  
+  <title>Hexo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta property="og:type" content="website">
+<meta property="og:title" content="Hexo">
+<meta property="og:url" content="http://example.com/index.html">
+<meta property="og:site_name" content="Hexo">
+<meta property="og:locale" content="en_US">
+<meta property="article:author" content="John Doe">
+<meta name="twitter:card" content="summary">
+  
+    <link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+  
+  
+    <link rel="shortcut icon" href="/favicon.png">
+  
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+    
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+
+  
+  
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fork-awesome@1.2.0/css/fork-awesome.min.css">
+
+<meta name="generator" content="Hexo 7.3.0"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Hexo</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"><span class="fa fa-bars"></span></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+        
+          <a class="nav-icon" href="/atom.xml" title="RSS Feed"><span class="fa fa-rss"></span></a>
+        
+        <a class="nav-icon nav-search-btn" title="Search"><span class="fa fa-search"></span></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="Search"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="http://example.com"></form>
+      </div>
+    </div>
+  </div>
+</header>
+
+      <div class="outer">
+        <section id="main">
+  
+    <article id="post-sqli-labs靶场" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2026/03/21/sqli-labs%E9%9D%B6%E5%9C%BA/" class="article-date">
+  <time class="dt-published" datetime="2026-03-21T13:46:57.544Z" itemprop="datePublished">2026-03-21</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <p>sqli-labs靶场</p>
+<p>SQL注入思路介绍</p>
+<p>SQL注入的本质是攻击者将恶意SQL代码通过Payload插入到SQL语句中，同时开发者没有对用户输入进行充分的过滤和转义，导致原先的SQL语句结构和语义改变。</p>
+<p>SQL注入的根本原因在于开发者过于信任用户输入，没有对用户输入进行充分验证和转义。使用了字符串拼接构造SQL语句，而非参数化查询。没有对报错进行过滤，数据库的错误信息被直接返回给前端，泄露敏感信息间接帮助攻击者进行信息收集。这同时也是SQL注入的防御思路。</p>
+<p>根据SQL注入的根本原因，SQL注入的思路在于寻找注入点，尝试Payload，探测能否改变SQL语句的原有结构。尝试使用闭合符破环SQL语句的原有结构。拼接、构造恶意SQL语句完成非法操作。利用数据库错误信息进行信息收集。最终获取数据甚至服务器权限。</p>
+<p>sqli-labs靶场介绍</p>
+<p>sqli-labs靶场是一个专门用于学习和练习SQL注入的开源靶场，每个关卡都专注于不同的注入场景和技巧。</p>
+<p>关于如何快速判断简单环境下的注入类型和闭合符</p>
+<p>根据传值方式和Payload类型分为四类</p>
+<p>GET数字型：</p>
+<p>?id&#x3D;-1 or 1&#x3D;1– ，id&#x3D;-1是为了达成false条件，具体情境具体分析。如果正常回显表示SQL语义可能为false or true或是被闭合符闭合了。</p>
+<p>?id&#x3D;-1 or 1&#x3D;2– ，如果无回显说明1&#x3D;2的变化导致SQL语义改变为false or false了，说明注入点属于GET数字型。</p>
+<p>GET字符型：</p>
+<p>?id&#x3D;-1 or 1&#x3D;1– ，如果无回显说明1&#x3D;1并没有使SQL语义变为false or true，直接排除数字型，注入点属于GET字符型。</p>
+<p>?id&#x3D;-1’ or 1&#x3D;1– ，如果没有报错，即正常回显或无回显说明闭合符错误，改为双引号继续尝试。如果报错提示错误出现在闭合符附近说明闭合符缺少括号，添加括号闭合并进一步尝试。</p>
+<p>?id&#x3D;-1’) or 1&#x3D;1– ，如果持续报错则尝试继续添加括号闭合，如果正常回显说明SQL语义为false or true，id&#x3D;-1’)部分成功改变了SQL语义，被闭合符正确为’) 。</p>
+<p>POST数字型：</p>
+<p>-1 or 1&#x3D;1# ，如果正常回显表示SQL语义为false or true或是被闭合符闭合了。</p>
+<p>-1 or 1&#x3D;2# ，如果无回显说明1&#x3D;2的变化导致SQL语义改变为false or true了，说明注入点属于POST数字型。</p>
+<p>POST字符型：</p>
+<p>‘ or 1&#x3D;1#， 如果没有报错，即正常回显或无回显说明闭合符错误，改为双引号继续尝试。如果报错提示错误出现在闭合符附近说明闭合符缺少括号，添加括号闭合并进一步尝试。</p>
+<p>‘) or 1&#x3D;1#， 如果持续报错则尝试继续添加括号闭合，如果正常回显说明SQL语义为false or true，id&#x3D;-1’)部分成功改变了SQL语义，被闭合符正确为’) 。</p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2026/03/21/sqli-labs%E9%9D%B6%E5%9C%BA/" data-id="cmn0g9v5900016cd5d2rt31sh" data-title="" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
+    <article id="post-hello-world" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2026/03/21/hello-world/" class="article-date">
+  <time class="dt-published" datetime="2026-03-21T12:52:14.646Z" itemprop="datePublished">2026-03-21</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2026/03/21/hello-world/">Hello World</a>
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <p>Welcome to <a target="_blank" rel="noopener" href="https://hexo.io/">Hexo</a>! This is your very first post. Check <a target="_blank" rel="noopener" href="https://hexo.io/docs/">documentation</a> for more info. If you get any problems when using Hexo, you can find the answer in <a target="_blank" rel="noopener" href="https://hexo.io/docs/troubleshooting.html">troubleshooting</a> or you can ask me on <a target="_blank" rel="noopener" href="https://github.com/hexojs/hexo/issues">GitHub</a>.</p>
+<h2 id="Quick-Start"><a href="#Quick-Start" class="headerlink" title="Quick Start"></a>Quick Start</h2><h3 id="Create-a-new-post"><a href="#Create-a-new-post" class="headerlink" title="Create a new post"></a>Create a new post</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo new <span class="string">&quot;My New Post&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/writing.html">Writing</a></p>
+<h3 id="Run-server"><a href="#Run-server" class="headerlink" title="Run server"></a>Run server</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo server</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/server.html">Server</a></p>
+<h3 id="Generate-static-files"><a href="#Generate-static-files" class="headerlink" title="Generate static files"></a>Generate static files</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo generate</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/generating.html">Generating</a></p>
+<h3 id="Deploy-to-remote-sites"><a href="#Deploy-to-remote-sites" class="headerlink" title="Deploy to remote sites"></a>Deploy to remote sites</h3><figure class="highlight bash"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">$ hexo deploy</span><br></pre></td></tr></table></figure>
+
+<p>More info: <a target="_blank" rel="noopener" href="https://hexo.io/docs/one-command-deployment.html">Deployment</a></p>
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="http://example.com/2026/03/21/hello-world/" data-id="cmn0g9v5400006cd5cda129g6" data-title="Hello World" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      
+      
+      
+    </footer>
+  </div>
+  
+</article>
+
+
+
+  
+
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+
+  
+    
+
+  
+    
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Archives</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2026/03/">March 2026</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">Recent Posts</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2026/03/21/sqli-labs%E9%9D%B6%E5%9C%BA/">(no title)</a>
+          </li>
+        
+          <li>
+            <a href="/2026/03/21/hello-world/">Hello World</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      
+      &copy; 2026 John Doe<br>
+      Powered by <a href="https://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+
+<script src="/js/jquery-3.6.4.min.js"></script>
+
+
+
+  
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script src="/js/script.js"></script>
+
+
+
+
+
+  </div>
+</body>
+</html>

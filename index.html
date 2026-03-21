@@ -74,45 +74,88 @@
     <article id="post-sqli-labs靶场" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
   <div class="article-meta">
     <a href="/2026/03/21/sqli-labs%E9%9D%B6%E5%9C%BA/" class="article-date">
-  <time class="dt-published" datetime="2026-03-21T13:46:57.544Z" itemprop="datePublished">2026-03-21</time>
+  <time class="dt-published" datetime="2026-03-21T13:46:57.000Z" itemprop="datePublished">2026-03-21</time>
 </a>
     
+  <div class="article-category">
+    <a class="article-category-link" href="/categories/%E5%AE%89%E5%85%A8%E6%8A%80%E6%9C%AF/">安全技术</a>
+  </div>
+
   </div>
   <div class="article-inner">
     
     
+      <header class="article-header">
+        
+  
+    <h1 itemprop="name">
+      <a class="p-name article-title" href="/2026/03/21/sqli-labs%E9%9D%B6%E5%9C%BA/">sqli-labs 靶场与 SQL 注入思路总结</a>
+    </h1>
+  
+
+      </header>
+    
     <div class="e-content article-entry" itemprop="articleBody">
       
-        <p>sqli-labs靶场</p>
-<p>SQL注入思路介绍</p>
-<p>SQL注入的本质是攻击者将恶意SQL代码通过Payload插入到SQL语句中，同时开发者没有对用户输入进行充分的过滤和转义，导致原先的SQL语句结构和语义改变。</p>
-<p>SQL注入的根本原因在于开发者过于信任用户输入，没有对用户输入进行充分验证和转义。使用了字符串拼接构造SQL语句，而非参数化查询。没有对报错进行过滤，数据库的错误信息被直接返回给前端，泄露敏感信息间接帮助攻击者进行信息收集。这同时也是SQL注入的防御思路。</p>
-<p>根据SQL注入的根本原因，SQL注入的思路在于寻找注入点，尝试Payload，探测能否改变SQL语句的原有结构。尝试使用闭合符破环SQL语句的原有结构。拼接、构造恶意SQL语句完成非法操作。利用数据库错误信息进行信息收集。最终获取数据甚至服务器权限。</p>
-<p>sqli-labs靶场介绍</p>
-<p>sqli-labs靶场是一个专门用于学习和练习SQL注入的开源靶场，每个关卡都专注于不同的注入场景和技巧。</p>
-<p>关于如何快速判断简单环境下的注入类型和闭合符</p>
-<p>根据传值方式和Payload类型分为四类</p>
-<p>GET数字型：</p>
-<p>?id&#x3D;-1 or 1&#x3D;1– ，id&#x3D;-1是为了达成false条件，具体情境具体分析。如果正常回显表示SQL语义可能为false or true或是被闭合符闭合了。</p>
-<p>?id&#x3D;-1 or 1&#x3D;2– ，如果无回显说明1&#x3D;2的变化导致SQL语义改变为false or false了，说明注入点属于GET数字型。</p>
-<p>GET字符型：</p>
-<p>?id&#x3D;-1 or 1&#x3D;1– ，如果无回显说明1&#x3D;1并没有使SQL语义变为false or true，直接排除数字型，注入点属于GET字符型。</p>
-<p>?id&#x3D;-1’ or 1&#x3D;1– ，如果没有报错，即正常回显或无回显说明闭合符错误，改为双引号继续尝试。如果报错提示错误出现在闭合符附近说明闭合符缺少括号，添加括号闭合并进一步尝试。</p>
-<p>?id&#x3D;-1’) or 1&#x3D;1– ，如果持续报错则尝试继续添加括号闭合，如果正常回显说明SQL语义为false or true，id&#x3D;-1’)部分成功改变了SQL语义，被闭合符正确为’) 。</p>
-<p>POST数字型：</p>
-<p>-1 or 1&#x3D;1# ，如果正常回显表示SQL语义为false or true或是被闭合符闭合了。</p>
-<p>-1 or 1&#x3D;2# ，如果无回显说明1&#x3D;2的变化导致SQL语义改变为false or true了，说明注入点属于POST数字型。</p>
-<p>POST字符型：</p>
-<p>‘ or 1&#x3D;1#， 如果没有报错，即正常回显或无回显说明闭合符错误，改为双引号继续尝试。如果报错提示错误出现在闭合符附近说明闭合符缺少括号，添加括号闭合并进一步尝试。</p>
-<p>‘) or 1&#x3D;1#， 如果持续报错则尝试继续添加括号闭合，如果正常回显说明SQL语义为false or true，id&#x3D;-1’)部分成功改变了SQL语义，被闭合符正确为’) 。</p>
+        <h2 id="一、SQL-注入思路介绍"><a href="#一、SQL-注入思路介绍" class="headerlink" title="一、SQL 注入思路介绍"></a>一、SQL 注入思路介绍</h2><p>SQL 注入的本质是攻击者将恶意 SQL 代码通过 <strong>Payload</strong> 插入到 SQL 语句中，而开发者没有对用户输入进行充分的过滤和转义，导致原先的 SQL 语句结构和语义发生改变。</p>
+<p><strong>根本原因</strong>在于：</p>
+<ul>
+<li>开发者过于信任用户输入，没有进行充分验证和转义</li>
+<li>使用字符串拼接构造 SQL 语句，而非参数化查询</li>
+<li>数据库错误信息被直接返回给前端，为攻击者提供了信息收集的便利</li>
+</ul>
+<p>基于上述原因，SQL 注入的<strong>防御思路</strong>也就清晰了：严格过滤输入、使用参数化查询、不向用户暴露错误信息。</p>
+<p><strong>注入的基本思路</strong>：</p>
+<ol>
+<li>寻找注入点（用户可控输入的位置）</li>
+<li>尝试 Payload，探测能否改变 SQL 语句的原有结构</li>
+<li>使用闭合符破坏原有语句结构</li>
+<li>拼接、构造恶意 SQL 语句完成非法操作</li>
+<li>利用数据库错误信息进行信息收集</li>
+<li>最终获取数据甚至服务器权限</li>
+</ol>
+<h2 id="二、sqli-labs-靶场简介"><a href="#二、sqli-labs-靶场简介" class="headerlink" title="二、sqli-labs 靶场简介"></a>二、sqli-labs 靶场简介</h2><p><a target="_blank" rel="noopener" href="https://github.com/Audi-1/sqli-labs">sqli-labs</a> 是一个专门用于学习和练习 SQL 注入的开源靶场，每个关卡都专注于不同的注入场景和技巧，非常适合手工练习。</p>
+<h2 id="三、快速判断注入类型与闭合符（简单环境）"><a href="#三、快速判断注入类型与闭合符（简单环境）" class="headerlink" title="三、快速判断注入类型与闭合符（简单环境）"></a>三、快速判断注入类型与闭合符（简单环境）</h2><p>根据传值方式和 Payload 类型，可以分为四种常见场景。</p>
+<h3 id="1-GET-数字型"><a href="#1-GET-数字型" class="headerlink" title="1. GET 数字型"></a>1. GET 数字型</h3><ul>
+<li><p><code>?id=-1 or 1=1 -- </code><br>如果正常回显，说明 SQL 语义可能为 <code>false or true</code> 或已被闭合符闭合。</p>
+</li>
+<li><p><code>?id=-1 or 1=2 -- </code><br>如果无回显，说明 <code>1=2</code> 的变化导致 SQL 语义变为 <code>false or false</code>，注入点属于 GET 数字型。</p>
+</li>
+</ul>
+<h3 id="2-GET-字符型"><a href="#2-GET-字符型" class="headerlink" title="2. GET 字符型"></a>2. GET 字符型</h3><ul>
+<li><p><code>?id=-1 or 1=1 -- </code><br>如果无回显，说明 <code>1=1</code> 并未使 SQL 语义变为 <code>false or true</code>，可排除数字型，注入点可能属于字符型。</p>
+</li>
+<li><p><code>?id=-1&#39; or 1=1 -- </code><br>如果没有报错（正常回显或无回显），说明闭合符错误，改为双引号继续尝试。<br>如果报错提示错误出现在闭合符附近，说明闭合符缺少括号，可添加括号闭合并进一步尝试，例如 <code>?id=-1&#39;) or 1=1 -- </code>。</p>
+</li>
+<li><p>持续报错时，继续尝试添加括号闭合，直至正常回显。若正常回显，说明 SQL 语义变为 <code>false or true</code>，闭合符（如 <code>&#39;)</code>）成功闭合了原有语句。</p>
+</li>
+</ul>
+<h3 id="3-POST-数字型"><a href="#3-POST-数字型" class="headerlink" title="3. POST 数字型"></a>3. POST 数字型</h3><ul>
+<li><p><code>-1 or 1=1#</code><br>如果正常回显，表示 SQL 语义为 <code>false or true</code> 或已被闭合符闭合。</p>
+</li>
+<li><p><code>-1 or 1=2#</code><br>如果无回显，说明 <code>1=2</code> 的变化导致 SQL 语义变为 <code>false or false</code>，注入点属于 POST 数字型。</p>
+</li>
+</ul>
+<h3 id="4-POST-字符型"><a href="#4-POST-字符型" class="headerlink" title="4. POST 字符型"></a>4. POST 字符型</h3><ul>
+<li><p><code>&#39; or 1=1#</code><br>如果没有报错（正常回显或无回显），说明闭合符错误，改为双引号继续尝试。<br>如果报错提示错误出现在闭合符附近，说明缺少括号，可尝试 <code>&#39;) or 1=1#</code> 等。</p>
+</li>
+<li><p>持续报错时，继续添加括号闭合，直到正常回显，说明闭合符正确。</p>
+</li>
+</ul>
+<hr>
+<h2 id="四、小结"><a href="#四、小结" class="headerlink" title="四、小结"></a>四、小结</h2><p>以上是 SQL 注入最基础的手工判断方法。在实际靶机或真实环境中，还可能遇到过滤、编码、WAF 等更复杂的情况，但核心思路不变：<strong>破坏原有语句结构 → 构造合法查询 → 获取数据</strong>。</p>
+<p>后续我将以 sqli-labs 的具体关卡为例，详细记录每种注入类型的完整利用过程。</p>
+<p>（未完待续）</p>
 
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://example.com/2026/03/21/sqli-labs%E9%9D%B6%E5%9C%BA/" data-id="cmn0g9v5900016cd5d2rt31sh" data-title="" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      <a data-url="http://example.com/2026/03/21/sqli-labs%E9%9D%B6%E5%9C%BA/" data-id="cmn0gj13f0000kcd59gh29gxc" data-title="sqli-labs 靶场与 SQL 注入思路总结" class="article-share-link"><span class="fa fa-share">Share</span></a>
       
       
       
+  <ul class="article-tag-list" itemprop="keywords"><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/SQL%E6%B3%A8%E5%85%A5/" rel="tag">SQL注入</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/sqli-labs/" rel="tag">sqli-labs</a></li><li class="article-tag-list-item"><a class="article-tag-list-link" href="/tags/%E6%B8%97%E9%80%8F%E6%B5%8B%E8%AF%95/" rel="tag">渗透测试</a></li></ul>
+
     </footer>
   </div>
   
@@ -160,7 +203,7 @@
       
     </div>
     <footer class="article-footer">
-      <a data-url="http://example.com/2026/03/21/hello-world/" data-id="cmn0g9v5400006cd5cda129g6" data-title="Hello World" class="article-share-link"><span class="fa fa-share">Share</span></a>
+      <a data-url="http://example.com/2026/03/21/hello-world/" data-id="cmn0gj13i0001kcd5hbq50jlr" data-title="Hello World" class="article-share-link"><span class="fa fa-share">Share</span></a>
       
       
       
@@ -179,12 +222,33 @@
           <aside id="sidebar">
   
     
+  <div class="widget-wrap">
+    <h3 class="widget-title">Categories</h3>
+    <div class="widget">
+      <ul class="category-list"><li class="category-list-item"><a class="category-list-link" href="/categories/%E5%AE%89%E5%85%A8%E6%8A%80%E6%9C%AF/">安全技术</a></li></ul>
+    </div>
+  </div>
+
 
   
     
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tags</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/SQL%E6%B3%A8%E5%85%A5/" rel="tag">SQL注入</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/sqli-labs/" rel="tag">sqli-labs</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/%E6%B8%97%E9%80%8F%E6%B5%8B%E8%AF%95/" rel="tag">渗透测试</a></li></ul>
+    </div>
+  </div>
+
 
   
     
+  <div class="widget-wrap">
+    <h3 class="widget-title">Tag Cloud</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/SQL%E6%B3%A8%E5%85%A5/" style="font-size: 10px;">SQL注入</a> <a href="/tags/sqli-labs/" style="font-size: 10px;">sqli-labs</a> <a href="/tags/%E6%B8%97%E9%80%8F%E6%B5%8B%E8%AF%95/" style="font-size: 10px;">渗透测试</a>
+    </div>
+  </div>
+
   
     
   <div class="widget-wrap">
@@ -203,7 +267,7 @@
       <ul>
         
           <li>
-            <a href="/2026/03/21/sqli-labs%E9%9D%B6%E5%9C%BA/">(no title)</a>
+            <a href="/2026/03/21/sqli-labs%E9%9D%B6%E5%9C%BA/">sqli-labs 靶场与 SQL 注入思路总结</a>
           </li>
         
           <li>

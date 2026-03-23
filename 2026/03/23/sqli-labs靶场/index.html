@@ -7,7 +7,7 @@
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="https://avatars.githubusercontent.com/u/185476288?v=4&size=64">
 <meta property="article:published_time" content="2026-03-22T16:00:00.000Z">
-<meta property="article:modified_time" content="2026-03-23T10:43:38.543Z">
+<meta property="article:modified_time" content="2026-03-23T14:09:56.787Z">
 <meta property="article:author" content="trifbxy">
 <meta property="article:tag" content="SQL注入">
 <meta property="article:tag" content="sqli-labs">
@@ -20,7 +20,7 @@
   "url": "https://trifbxy.github.io/2026/03/23/sqli-labs%E9%9D%B6%E5%9C%BA/",
   "image": "https://avatars.githubusercontent.com/u/185476288?v=4&size=64",
   "datePublished": "2026-03-22T16:00:00.000Z",
-  "dateModified": "2026-03-23T10:43:38.543Z",
+  "dateModified": "2026-03-23T14:09:56.787Z",
   "author": [
     {
       "@type": "Person",
@@ -161,7 +161,7 @@
   isHighlightShrink: false,
   isToc: true,
   pageType: 'post'
-}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">trifbxy's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">sqli-labs 靶场与 SQL 注入思路总结</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"></div></nav><div id="post-info"><h1 class="post-title">sqli-labs 靶场与 SQL 注入思路总结</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-03-22T16:00:00.000Z" title="发表于 2026-03-23 00:00:00">2026-03-23</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-03-23T10:43:38.543Z" title="更新于 2026-03-23 18:43:38">2026-03-23</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><h2 id="一、SQL-注入思路介绍"><a href="#一、SQL-注入思路介绍" class="headerlink" title="一、SQL 注入思路介绍"></a>一、SQL 注入思路介绍</h2><p>SQL 注入的本质是攻击者将 SQL 代码通过 <strong>Payload</strong> 插入到 SQL 语句中，而开发者没有对用户输入进行充分的过滤和转义，导致原先的 SQL 语句<strong>结构和语义</strong>发生<strong>改变</strong>。</p>
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">trifbxy's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">sqli-labs 靶场与 SQL 注入思路总结</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"></div></nav><div id="post-info"><h1 class="post-title">sqli-labs 靶场与 SQL 注入思路总结</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-03-22T16:00:00.000Z" title="发表于 2026-03-23 00:00:00">2026-03-23</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-03-23T14:09:56.787Z" title="更新于 2026-03-23 22:09:56">2026-03-23</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><h2 id="一、SQL-注入思路介绍"><a href="#一、SQL-注入思路介绍" class="headerlink" title="一、SQL 注入思路介绍"></a>一、SQL 注入思路介绍</h2><p>SQL 注入的本质是攻击者将 SQL 代码通过 <strong>Payload</strong> 插入到 SQL 语句中，而开发者没有对用户输入进行充分的过滤和转义，导致原先的 SQL 语句<strong>结构和语义</strong>发生<strong>改变</strong>。</p>
 <p><strong>根本原因</strong>：</p>
 <ul>
 <li>开发者过于信任用户输入，没有进行充分<strong>验证和转义</strong>。</li>
@@ -347,7 +347,7 @@
 
 <p><img src="https://cdn.jsdelivr.net/gh/trifbxy/image-hosting@main/sqli-labs/sqli-labs-5.2.png" alt="字符型 payload 有回显"></p>
 <p>出现回显改变。虽然回显内容与 Less-1 不同（只有成功&#x2F;失败的状态提示），但测试逻辑依然成立。第二个 Payload 导致页面发生变化，说明成功修改了 SQL 结构，确认闭合符为 <code>&#39;</code>。</p>
-<h3 id="2-floor-报错注入"><a href="#2-floor-报错注入" class="headerlink" title="2. floor() 报错注入"></a>2. floor() 报错注入</h3><p>Less-5 页面不会直接回显我们查询的数据内容，此时联合查询注入失效。由于网页固定回显 <code>You are in...</code>，可以尝试报错注入或布尔盲注。这里优先选择时间效率更高的<strong>报错注入</strong>。</p>
+<h3 id="2-floor-报错注入"><a href="#2-floor-报错注入" class="headerlink" title="2. floor() 报错注入"></a>2. floor() 报错注入</h3><p>Less-5 页面不会直接回显我们查询的数据内容，此时联合查询注入失效。页面固定回显，无数据输出，但存在报错信息。此时优先选择时间效率更高的报错注入；若报错函数被禁用或无效，再转向布尔盲注。</p>
 <p>使用 <code>floor()</code> 函数结合 <code>group by</code> 的报错注入（也叫<strong>双查询注入</strong>）探测数据库名：</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?id=-1&#x27; or (select 1 from (select count(*),concat((database()),floor(rand(0)*2))x from information_schema.tables group by x)a)--+</span><br></pre></td></tr></table></figure>
 
@@ -392,26 +392,26 @@
 
 <p><img src="https://cdn.jsdelivr.net/gh/trifbxy/image-hosting@main/sqli-labs/sqli-labs-7.2.png" alt="联合查询写入 webshell（报错但文件已成功写入）"></p>
 <h3 id="4-经典现象解析"><a href="#4-经典现象解析" class="headerlink" title="4. 经典现象解析"></a>4. 经典现象解析</h3><p>执行上述 Payload 后，页面虽然出现了 <code>You have an error in your SQL syntax</code> 的报错，但这<strong>并不表明文件上传失败</strong>，这个报错其实是一个假象。其本质是因为 <code>INTO OUTFILE</code> 成功将数据写入了文件，导致数据库没有向前端返回常规的数据结果集（Result Set）。后端 PHP 代码试图去解析一个空的结果集时失败，从而触发了靶场开发者预先写死在代码里的 <code>else</code> 报错分支。</p>
-<h3 id="5-验证成功"><a href="#5-验证成功" class="headerlink" title="5. 验证成功"></a>5. 验证成功</h3><p>通过蚁剑（AntSword）连接我们刚刚写入的 webshell.php 进行验证：</p>
+<h3 id="5-验证成功"><a href="#5-验证成功" class="headerlink" title="5. 验证成功"></a>5. 验证成功</h3><p>黑盒测试中，页面报错的来源往往不明。面对文件上传后的报错，更可靠的做法是<strong>主动验证</strong>——通过蚁剑（AntSword）等工具直接连接 webshell.php，而非依赖报错信息本身。</p>
 <p><img src="https://cdn.jsdelivr.net/gh/trifbxy/image-hosting@main/sqli-labs/sqli-labs-7.3.png" alt="蚁剑连接webshell"></p>
 <blockquote>
 <p><strong>核心思维：穿透假象，多维验证</strong></p>
-<p>本关揭示了“报错但成功”的现象本质——写入操作早于结果集检查。在实际测试中，绝不能仅依赖单一的页面报错信息做判断，应当综合多种方式（如直接访问文件、带外请求 OOB、用蚁剑连接）进行多维验证。</p>
+<p>本关揭示了“报错但成功”的现象本质——写入操作早于结果集检查。在实际测试中，绝不能仅依赖单一的页面报错信息做判断，应当主动综合多种方式（如直接访问文件、带外请求 OOB、用蚁剑连接）进行多维验证。</p>
 </blockquote>
 <h2 id="十、sqli-labs-靶场实战：Less-8（布尔盲注）"><a href="#十、sqli-labs-靶场实战：Less-8（布尔盲注）" class="headerlink" title="十、sqli-labs 靶场实战：Less-8（布尔盲注）"></a>十、sqli-labs 靶场实战：Less-8（布尔盲注）</h2><h3 id="1-判断注入点与闭合符-2"><a href="#1-判断注入点与闭合符-2" class="headerlink" title="1. 判断注入点与闭合符"></a>1. 判断注入点与闭合符</h3><p>通过初步探测，确认 Less-8 的注入点类型为 GET 字符型，闭合符为 <code>&#39;</code>。</p>
 <h3 id="2-为什么选择布尔盲注"><a href="#2-为什么选择布尔盲注" class="headerlink" title="2. 为什么选择布尔盲注"></a>2. 为什么选择布尔盲注</h3><p>Less-8 的页面表现与 Less-5 类似：无论 SQL 语句是否成功，都只显示固定的“You are in…”或什么都不显示，<strong>既无回显位，也无报错信息</strong>。此时联合查询和报错注入均无法使用，只能通过<strong>布尔盲注</strong>——根据条件真假导致的页面差异，逐字符推断数据。</p>
 <blockquote>
 <p><strong>思路</strong>：优先尝试效率更高的报错注入，当报错注入失效时，再转向布尔盲注。这里根据靶场标题选择盲注，实际测试中应优先尝试 <code>extractvalue</code> 等报错函数。</p>
 </blockquote>
-<h3 id="3-探测数据库名长度"><a href="#3-探测数据库名长度" class="headerlink" title="3. 探测数据库名长度"></a>3. 探测数据库名长度</h3><p>使用布尔条件 <code>LENGTH(database()) = n</code>，通过页面是否显示“You are in…”来判断长度。</p>
-<p>在 Burp Intruder 中使用 <strong>Sniper</strong> 模式，为参数 <code>n</code> 设置一个范围（如 1–20），发送请求：</p>
+<h3 id="3-探测数据库名长度"><a href="#3-探测数据库名长度" class="headerlink" title="3. 探测数据库名长度"></a>3. 探测数据库名长度</h3><p>使用布尔条件 <code>LENGTH(database()) = n</code>，根据SQL语义为false时无回显，为true时有回显的特性，通过页面是否显示“You are in…”来判断长度。</p>
+<p>在 Burp Intruder 中使用 <strong>Sniper</strong> 模式，为参数 <code>n</code> 设置一个范围（如 0–9），发送请求：</p>
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?id=-1&#x27; or length(database())=§1§--+</span><br></pre></td></tr></table></figure>
 
 <p><img src="https://cdn.jsdelivr.net/gh/trifbxy/image-hosting@main/sqli-labs/sqli-labs-8.1.png" alt="探测数据库名长度"></p>
-<p>通过<strong>响应包长度</strong>筛选异常值。当 <code>n=8</code> 时，返回包长度与其他请求明显不同，且页面正常显示“You are in…”，说明条件为真，<strong>数据库名长度为 8</strong>。</p>
+<p>通过<strong>响应包大小</strong>筛选异常值。仅当 <code>n=8</code> 时，响应包大小与其他请求明显不同，这很可能是正常回显，优先检查该响应包内容。</p>
 <p><img src="https://cdn.jsdelivr.net/gh/trifbxy/image-hosting@main/sqli-labs/sqli-labs-8.2.png" alt="长度判断结果"></p>
-<p>打开返回包的 <strong>Render</strong> 发现页面是正常回显的。</p>
-<p><img src="https://cdn.jsdelivr.net/gh/trifbxy/image-hosting@main/sqli-labs/sqli-labs-8.3.png" alt="cluster bomb 爆破过程"></p>
+<p>打开响应包的 <strong>Render</strong> 发现页面是正常回显的。</p>
+<p><img src="https://cdn.jsdelivr.net/gh/trifbxy/image-hosting@main/sqli-labs/sqli-labs-8.3.png" alt="布尔盲注正确回显"></p>
 <p>说明 <code>-1&#39; or length(database())=8</code> 使 SQL 整体语义变为了 True，从而确认数据库名长度为 <strong>8</strong>。</p>
 <h3 id="4-逐字符猜解数据库名"><a href="#4-逐字符猜解数据库名" class="headerlink" title="4. 逐字符猜解数据库名"></a>4. 逐字符猜解数据库名</h3><p>确定长度为 8 后，使用 <code>ASCII(SUBSTR(database(),i,1)) = x</code> 逐个字符猜解。由于需要同时变化<strong>位置 i</strong> 和 <strong>ASCII 值 x</strong>，在 Burp Intruder 中使用 <strong>Cluster bomb</strong> 模式。</p>
 <p>设置两个 Payload 集：</p>
@@ -422,7 +422,7 @@
 <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">?id=-1&#x27; or ascii(mid(database(),§1§,1))=§1§--+</span><br></pre></td></tr></table></figure>
 
 <p><img src="https://cdn.jsdelivr.net/gh/trifbxy/image-hosting@main/sqli-labs/sqli-labs-8.4.png" alt="数据库名结果"></p>
-<p>发送后，通过<strong>响应包长度</strong>筛选正确的组合。大部分错误请求的返回包长度集中在 1000 以上，而正确的请求（如 <code>i=1, x=115</code>）返回包长度约为 900 多字节，且页面显示“You are in…”。</p>
+<p>发送后，通过<strong>响应包大小</strong>筛选正确的组合。在大量请求中，匹配特征快速定位响应。通过对比响应包大小，错误请求集中在 1000 字节以上，而大小为 986 字节的包恰好有 8 个，与数据库名长度一致。这些极有可能是正确的返回包，优先查看其内容，发现页面显示 “You are in…”，确认为正确返回包。</p>
 <p><img src="https://cdn.jsdelivr.net/gh/trifbxy/image-hosting@main/sqli-labs/sqli-labs-8.5.png" alt="数据库名结果"></p>
 <p>依次确定所有字符的 ASCII 值，得到数据库名为 <code>security</code> 。</p>
 <h3 id="5-后续爆破"><a href="#5-后续爆破" class="headerlink" title="5. 后续爆破"></a>5. 后续爆破</h3><p>表名、字段名、数据的获取流程与 Less-1 中的联合查询类似，只需将子查询替换为布尔条件，并用同样的方式逐字符猜解。由于原理相同，此处不再赘述。</p>

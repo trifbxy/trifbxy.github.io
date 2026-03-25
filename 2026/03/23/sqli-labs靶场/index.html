@@ -7,7 +7,7 @@
 <meta property="og:locale" content="zh_CN">
 <meta property="og:image" content="https://avatars.githubusercontent.com/u/185476288?v=4&size=64">
 <meta property="article:published_time" content="2026-03-22T16:00:00.000Z">
-<meta property="article:modified_time" content="2026-03-25T13:21:11.511Z">
+<meta property="article:modified_time" content="2026-03-25T13:31:41.796Z">
 <meta property="article:author" content="trifbxy">
 <meta property="article:tag" content="SQL注入">
 <meta property="article:tag" content="sqli-labs">
@@ -19,7 +19,7 @@
   "url": "https://trifbxy.github.io/2026/03/23/sqli-labs%E9%9D%B6%E5%9C%BA/",
   "image": "https://avatars.githubusercontent.com/u/185476288?v=4&size=64",
   "datePublished": "2026-03-22T16:00:00.000Z",
-  "dateModified": "2026-03-25T13:21:11.511Z",
+  "dateModified": "2026-03-25T13:31:41.796Z",
   "author": [
     {
       "@type": "Person",
@@ -160,7 +160,7 @@
   isHighlightShrink: false,
   isToc: true,
   pageType: 'post'
-}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">trifbxy's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">sqli-labs 靶场与 SQL 注入思路总结</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"></div></nav><div id="post-info"><h1 class="post-title">sqli-labs 靶场与 SQL 注入思路总结</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-03-22T16:00:00.000Z" title="发表于 2026-03-23 00:00:00">2026-03-23</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-03-25T13:21:11.511Z" title="更新于 2026-03-25 21:21:11">2026-03-25</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><blockquote>
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">trifbxy's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">sqli-labs 靶场与 SQL 注入思路总结</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"></div></nav><div id="post-info"><h1 class="post-title">sqli-labs 靶场与 SQL 注入思路总结</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-03-22T16:00:00.000Z" title="发表于 2026-03-23 00:00:00">2026-03-23</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-03-25T13:31:41.796Z" title="更新于 2026-03-25 21:31:41">2026-03-25</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><blockquote>
 <p><strong>免责声明</strong>  </p>
 <ol>
 <li>本文所涉及的所有技术、代码、Payload 及工具，仅限于在本地搭建的合法靶场环境（如 sqli-labs）中进行学习和研究，严禁用于任何未经授权的真实系统。  </li>
@@ -741,11 +741,13 @@
 <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">UPDATE</span> users <span class="keyword">SET</span> password<span class="operator">=</span><span class="string">&#x27;$new_pw&#x27;</span> <span class="keyword">WHERE</span> username<span class="operator">=</span><span class="string">&#x27;$username&#x27;</span></span><br></pre></td></tr></table></figure>
 <p>其中 <code>$username</code> 是从数据库取出的原始值 <code>test&#39; or 1=1#</code>，且 <strong>该处未进行转义</strong>。拼接后的 SQL 变为：</p>
 <figure class="highlight sql"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">UPDATE</span> users <span class="keyword">SET</span> password<span class="operator">=</span><span class="string">&#x27;123&#x27;</span> <span class="keyword">WHERE</span> username<span class="operator">=</span><span class="string">&#x27;test&#x27;</span> <span class="keyword">or</span> <span class="number">1</span><span class="operator">=</span><span class="number">1</span>#<span class="string">&#x27;</span></span><br></pre></td></tr></table></figure>
-<p>由于 <code>or 1=1</code> 恒真，<code>#</code> 注释掉后续内容，这条 UPDATE 语句将修改 <strong>所有用户</strong> 的密码为 <code>123</code>。</p>
+<p>由于 <code>or 1=1</code> 恒真，<code>#</code> 注释掉后续内容，这条 UPDATE 语句将修改 <strong>所有用户</strong> 的密码为 <code>123456</code>。</p>
 <p><img src="https://cdn.jsdelivr.net/gh/trifbxy/image-hosting@main/sqli-labs/sqli-labs-24.2.png" alt="登录后更改密码"></p>
 <p>页面可能出现报错（触发了开发者预设的 else 分支），但实际修改已生效。</p>
-<p><strong>第三步：验证结果</strong><br>尝试使用常见用户名 <code>admin</code>，密码改为 <code>123</code>，成功登录，证明所有用户密码均被修改。</p>
+<p><strong>第三步：验证结果</strong><br>尝试使用常见用户名 <code>admin</code>，密码改为 <code>123456</code>，成功登录。</p>
 <p><img src="https://cdn.jsdelivr.net/gh/trifbxy/image-hosting@main/sqli-labs/sqli-labs-24.3.png" alt="修改密码后成功登录"></p>
+<p>实际所有数据均全部被修改。</p>
+<p><img src="https://cdn.jsdelivr.net/gh/trifbxy/image-hosting@main/sqli-labs/sqli-labs-24.4.png" alt="全部数据被修改"></p>
 <h3 id="4-实战红线提醒"><a href="#4-实战红线提醒" class="headerlink" title="4. 实战红线提醒"></a>4. 实战红线提醒</h3><p>在真实渗透测试中，<strong>绝对禁止</strong> 使用此类会造成全局破坏的 Payload。一次注入波及所有用户，不仅违反法律法规，也严重违背职业道德。在授权测试中，应优先使用 <code>limit 0,1</code> 等精确控制影响范围的方式，或仅验证漏洞存在即可。</p>
 <blockquote>
 <p><strong>核心思路</strong>：</p>

